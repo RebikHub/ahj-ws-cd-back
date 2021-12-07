@@ -1,16 +1,12 @@
-const http = require('http');
-// const https = require('https');
 const Koa = require('koa');
 const cors = require('koa2-cors');
 const koaBody = require('koa-body');
 const Router = require('koa-router');
+const { v4: uuidv4 } = require('uuid');
 const router = new Router();
 const app = new Koa();
-const { v4: uuidv4 } = require('uuid');
-
-const WS = require('ws');
-
-const users = [];
+const Instance = require('./instanceController');
+const instControl = new Instance();
 
 app.use(koaBody({
     urlencoded: true,
@@ -27,28 +23,75 @@ app.use(
     })
   )
 
-router.get('/users', async (ctx, next) => {
-    ctx.response.body = users;
+router.get('/instances', async (ctx) => {
+    ctx.response.body = instControl.instances;
 });
 
-router.post('/users', async (ctx, next) => {
-    try {
-        users.forEach((elem) => {
-            if (elem.nickname === ctx.request.body) {
-                throw new Error('такой никнейм уже есть!');
-            }
-        })
-        users.push({nickname: ctx.request.body, id: uuidv4()});
-        ctx.response.status = 204;
-    } catch (error) {
-        ctx.response.body = 'ошибка';
+router.post('/instances', async (ctx) => {
+    const method = ctx.request.body;
+    console.log(method);
+    switch (method) {
+        case 'create':
+        const id = uuidv4();
+        // ctx.response.body = instControl.create(id);
+        setTimeout(() => {
+            instControl.instances.push({
+              id: id,
+              state: 'stopped',
+            });
+            console.log('createed ok');
+            ctx.response.body = {
+                status: 'ok',
+                id: id,
+                info: 'Server create',
+              }
+          }, 20000);
+        ctx.response.body = {
+            status: 'ok',
+            id: id,
+            info: 'Recieved: Server is being created...',
+        }
+        break;
+        case 'start': ctx.response.body = instControl.start(id);
+        break;
+        case 'stop': ctx.response.body = instControl.stop(id);
+        break;
+        default:
+        ctx.response.status = 400;
+        ctx.response.body = `Unknown command '${method}'`;
     }
 });
 
-router.delete('/users/:id', async (ctx, next) => {
-    const index = users.findIndex((elem) => elem.id === ctx.params.id);
+  // app.use(async (ctx) => {
+//     let method;
+//     if (ctx.request.method === 'GET') ({ method } = ctx.request.query);
+//     else if (ctx.request.method === 'POST') ({ method } = ctx.request.body);
+  
+//       ctx.response.status = 200;
+      
+//     switch (method) {
+//       case 'allTickets': ctx.response.body = ticketController.getTickets();
+//         break;
+//       case 'ticketById': ctx.response.body = ticketController.getTicketById(ctx.request.query);
+//         break;
+//       case 'createTicket': ctx.response.body = ticketController.createTicket(ctx.request.body);
+//         break;
+//       case 'changeStatus': ctx.response.body = ticketController.changeStatus(ctx.request.body);
+//         break;
+//       case 'updateTicket': ctx.response.body = ticketController.updateTicket(ctx.request.body);
+//         break;
+//       case 'deleteTicket': ctx.response.body = ticketController.deleteTicket(ctx.request.body);
+//         break;
+//       default:
+//         ctx.response.status = 400;
+//         ctx.response.body = `Unknown method '${method}' in request parameters`;
+//     }
+//   });
+
+router.delete('/intsances/:id', async (ctx) => {
+    const index = instControl.instances.findIndex((elem) => elem.id === ctx.params.id);
     if (index !== -1) {
-        users.splice(index, 1);
+        instControl.instances.splice(index, 1);
     };
     ctx.response.status=204;
 });
@@ -56,17 +99,5 @@ router.delete('/users/:id', async (ctx, next) => {
 app.use(router.routes()).use(router.allowedMethods());
 
 const port = process.env.PORT || 3333;
-const server = http.createServer(app.callback())
 
-const wsServer = new WS.Server({ server });
-
-wsServer.on('connection', (ws, req) => {
-  ws.on('message', msg => {
-    const data = msg.toString('utf-8');
-    [...wsServer.clients]
-    .filter(o => o.readyState === WS.OPEN)
-    .forEach(o => o.send(data));
-  });
-});
-
-server.listen(port, () => console.log('Server started'));
+app.listen(port, () => console.log('Server started'));
