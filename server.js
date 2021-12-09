@@ -30,55 +30,6 @@ router.get('/instances', async (ctx) => {
     ctx.response.body = instances;
 });
 
-// router.post('/intsances', async (ctx) => {
-//     const method = ctx.request.body;
-//     const instId = ctx.params.id;
-//     console.log(ctx.params.id);
-//     console.log(method);
-//     switch (method) {
-//         case 'create':
-//         const id = uuidv4();
-//         ctx.response.body = {
-//           status: 'ok',
-//           id: id,
-//           info: 'Recieved: Server is being created...',
-//         };
-//         instances.push({
-//           id: id,
-//           state: 'stopped',
-//         });
-//         break;
-//         case 'start': ctx.response.body = {
-//           status: 'ok',
-//           id: id,
-//           info: 'Recieved: Server is being started...'
-//         };
-//         break;
-//         case 'stop': ctx.response.body = {
-//           status: 'ok',
-//           id: id,
-//           info: 'Recieved: Server is being stopped...'
-//         };
-//         break;
-//         case 'delete':
-//           // '/intsances/:id'
-//           const index = instances.findIndex((elem) => elem.id === ctx.params.id);
-//           if (index !== -1) {
-//             instances.splice(index, 1);
-//           };
-
-//         ctx.response.body = {
-//           status: 'ok',
-//           id: id,
-//           info: 'Recieved: Server is being deleted...'
-//         };
-//         break;
-//         default:
-//         ctx.response.status = 400;
-//         ctx.response.body = `Unknown command '${method}'`;
-//     }
-// });
-
 router.get('/create', async (ctx) => {
   const id = uuidv4();
   streamEvents(ctx.req, ctx.res, {
@@ -99,33 +50,49 @@ router.get('/create', async (ctx) => {
         });
         sse.sendEvent({
           id: uuidv4(),
-          data: JSON.stringify({INFO: 'Server create'}),
+          data: JSON.stringify({
+            id: id,
+            state: 'stopped',
+            INFO: 'Server create'
+          }),
           event: 'comment'
         });
-      }, 5000);
+      }, 20000);
     }
   });
 
-  // ctx.req.on('close', () => {
-  //   // ctx.res.end()
-  //   console.log('Client closed the connection.')
-  //   })
   ctx.respond = false;
 });
 
 router.get('/start', async (ctx) => {
-  ctx.response.body = {
-    status: 'ok'
-  }
+  const id = ctx.request.query.id;
   streamEvents(ctx.req, ctx.res, {
     stream(sse) {
+      sse.sendEvent({
+        id: uuidv4(),
+        data: JSON.stringify({
+                    status: 'ok',
+                    id: id,
+                    info: 'Recieved: Server is being started...'
+                  }),
+        event: 'comment'
+      });
       setTimeout(() => {
+        instances.forEach(elem => {
+          if (elem.id === id) {
+            elem.state = 'running';
+          }
+        })
         sse.sendEvent({
           id: uuidv4(),
-          data: JSON.stringify({INFO: 'Server start'}),
+          data: JSON.stringify({
+            id: id,
+            state: 'running',
+            INFO: 'Server start'
+          }),
           event: 'comment'
         });
-      }, 5000);
+      }, 20000);
     }
   });
 
@@ -133,18 +100,70 @@ router.get('/start', async (ctx) => {
 });
 
 router.get('/stop', async (ctx) => {
-  ctx.response.body = {
-    status: 'ok'
-  }
+  const id = ctx.request.query.id;
   streamEvents(ctx.req, ctx.res, {
     stream(sse) {
+      sse.sendEvent({
+        id: uuidv4(),
+        data: JSON.stringify({
+                    status: 'ok',
+                    id: id,
+                    info: 'Recieved: Server is being stopped...'
+                  }),
+        event: 'comment'
+      });
       setTimeout(() => {
+        instances.forEach(elem => {
+          if (elem.id === id) {
+            elem.state = 'stopped';
+          }
+        })
         sse.sendEvent({
           id: uuidv4(),
-          data: JSON.stringify({INFO: 'Server stop'}),
+          data: JSON.stringify({
+            id: id,
+            state: 'stopped',
+            INFO: 'Server stop'
+          }),
           event: 'comment'
         });
-      }, 5000);
+      }, 20000);
+    }
+  });
+
+  ctx.respond = false;
+});
+
+router.get('/delete', async (ctx) => {
+  const id = ctx.request.query.id;
+  streamEvents(ctx.req, ctx.res, {
+    stream(sse) {
+      sse.sendEvent({
+        id: uuidv4(),
+        data: JSON.stringify({
+                    status: 'ok',
+                    id: id,
+                    info: 'Recieved: Server is being deleted...'
+                  }),
+        event: 'comment'
+      });
+      setTimeout(() => {
+        let index;
+        instances.forEach((elem, i) => {
+          if (elem.id === id) {
+            index = i;
+          }
+        })
+        instances.splice(index, 1);
+        sse.sendEvent({
+          id: uuidv4(),
+          data: JSON.stringify({
+            id: id,
+            INFO: 'Server delete'
+          }),
+          event: 'comment'
+        });
+      }, 20000);
     }
   });
 
